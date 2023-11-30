@@ -1,0 +1,52 @@
+import requests
+from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+
+# Replace 'YOUR_TELEGRAM_BOT_TOKEN' with your actual Telegram bot token
+TOKEN = '6869678577:AAGoh92FqO3ndbIuXjdBJ3hAgH6qp-wKCJE'
+
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Welcome to the AliExpress Product Bot! Send me a product name to find similar cheap products.")
+
+def find_similar_product(update: Update, context: CallbackContext) -> None:
+    product_name = update.message.text
+    aliexpress_products = get_aliexpress_products(product_name)
+    
+    if aliexpress_products:
+        response = "\n".join(aliexpress_products)
+        update.message.reply_text(f"Similar cheap products on AliExpress:\n{response}")
+    else:
+        update.message.reply_text("No similar products found on AliExpress.")
+
+def get_aliexpress_products(product_name: str) -> list:
+    aliexpress_url = f'https://www.aliexpress.com/wholesale?SearchText={product_name}&SortType=price_asc'
+    response = requests.get(aliexpress_url)
+    
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        product_elements = soup.find_all('div', class_='item')
+        
+        aliexpress_products = []
+        for product_element in product_elements:
+            product_title = product_element.find('a', class_='product').text.strip()
+            product_price = product_element.find('span', class_='value').text.strip()
+            product_info = f"{product_title} - {product_price}"
+            aliexpress_products.append(product_info)
+        
+        return aliexpress_products
+    
+    return []
+
+def main() -> None:
+    updater = Updater(TOKEN)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, find_similar_product))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
